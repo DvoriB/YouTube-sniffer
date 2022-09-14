@@ -1,0 +1,15 @@
+{
+    "Request_packet_threshold": 700,
+    "Minimum_video_connection_size": 1000000,
+    "inbound_packets_in_range_min": 500,
+    "inbound_packets_in_range_max": 2000,
+    "outbound_packets_in_range_min": 0,
+    "outbound_packets_in_range_max": 699,
+    "max_diff_time_inbound_threshold": 500,
+    "Number_of_videos_to_output_statistics_per_video": 3,
+    "Max_number_of_connections": 1000,
+    "Max_number_of_transaction_per_video": 1000,
+    "video_connection_timeout": 20,
+    "YouTube_port": 443,
+    "YouTube_protocol": 17
+}
