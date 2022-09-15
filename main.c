@@ -288,20 +288,11 @@ void after_last(int index_in_array)
     lastUsed->next = current_node;
     current_node->prev = lastUsed;
     lastUsed = lastUsed->next;
-    if (lastUsed == NULL)
-    {
-        printf("LLLL\n");
-    }
 
     if (tailChanged == FALSE)
     {
 
         tail = lastUsed;
-    }
-    if (tail == NULL)
-    {
-        printf("bbbb\n");
-        sleep(1);
     }
 }
 void after_tail(int index_in_array)
@@ -329,11 +320,6 @@ void after_tail(int index_in_array)
         current_node->prev = tail;
         tail = tail->next;
         current_node->next = NULL;
-    }
-    if (tail == NULL)
-    {
-        printf("aaaa\n");
-        sleep(1);
     }
 }
 void have_connection(double packet_time, const struct sniff_ip *ip, const struct sniff_udp *udp, int index_in_array, char *connection_key, int client_server)
@@ -608,12 +594,8 @@ int main()
     fprintf(video, "Average size of the videos %lf\n", (double)size_of_the_videos / video_connection);
     fprintf(video, "Average number of TDRs per video %d\n", number_of_TDRs_per_video / video_connection);
     fprintf(video, "Average size of the TDRs per video %lf\n", (double)size_of_the_videos / number_of_TDRs_per_video);
-    fprintf(video, "Average duration of the TDRs per video %lf\n", duration_of_the_TDRs_per_video / video_connection);
+    fprintf(video, "Average duration of the TDRs per video %lf\n", duration_of_the_TDRs_per_video / number_of_TDRs_per_video);
     fprintf(video, "Average time between two consecutive TDRs %lf\n", (double)time_between_two_consecutive_TDRs / number_of_TDRs_per_video);
-
-    printf("%d\n", count);
-    printf("%d\n", timeount);
-    printf("video connection %d\n", video_connection);
     ht_destroy(hash_table);
     fclose(fpt);
     free(connections);
