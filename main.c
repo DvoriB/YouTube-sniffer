@@ -62,6 +62,7 @@ struct Node *lastUsed;
 char *connection_key;
 char *key;
 int tailChanged = FALSE; // flag to check if we have "empty" node is the list
+int count = 0;
 void init_connection(double packet_time, const struct sniff_ip *ip, const struct sniff_udp *udp, char *connection_key, int index_in_array);
 void update_connection(double packet_time, const struct sniff_ip *ip, const struct sniff_udp *udp, char *connection_key, int index_in_array);
 void close_connection(int index_in_array);
@@ -81,7 +82,7 @@ void close_transaction(double packet_time, int index_in_array)
 
     // write into the connection buffer the last transactin data
     char buffer[200];
-    sprintf(&buffer, "%d, %s, %s, %8d, %8d, %8u, %10d,    %lf, %4d, %4d, %10u, %10d,    %8lf, %8lf, %8lf, %lf \n", connections[index_in_array].connection_id, connections[index_in_array].server_ip, connections[index_in_array].client_ip, connections[index_in_array].server_port, connections[index_in_array].client_port, connections[index_in_array].ip_protocol, connections[index_in_array].transaction.transaction_id, connections[index_in_array].transaction.start_time, connections[index_in_array].transaction.num_inbound_packets_in_range, connections[index_in_array].transaction.num_outbound_packets_in_range, connections[index_in_array].transaction.max_packet_size_inbound, connections[index_in_array].transaction.min_packet_size_inbound, connections[index_in_array].transaction.max_diff_time_inbound, connections[index_in_array].transaction.min_diff_time_inbound, connections[index_in_array].transaction.square_inbound_packet_time_diff, connections[index_in_array].transaction.RTT);
+    sprintf(&buffer, "%d, %s, %s, %8d, %8d, %8u, %10d,    %lf, %4d, %4d, %10u, %10d,    %8lf, %8lf, %8lf, %lf\n\0", connections[index_in_array].connection_id, connections[index_in_array].server_ip, connections[index_in_array].client_ip, connections[index_in_array].server_port, connections[index_in_array].client_port, connections[index_in_array].ip_protocol, connections[index_in_array].transaction.transaction_id, connections[index_in_array].transaction.start_time, connections[index_in_array].transaction.num_inbound_packets_in_range, connections[index_in_array].transaction.num_outbound_packets_in_range, connections[index_in_array].transaction.max_packet_size_inbound, connections[index_in_array].transaction.min_packet_size_inbound, connections[index_in_array].transaction.max_diff_time_inbound, connections[index_in_array].transaction.min_diff_time_inbound, connections[index_in_array].transaction.square_inbound_packet_time_diff, connections[index_in_array].transaction.RTT);
     strcat(connections[index_in_array].buffer, buffer);
 }
 void open_transaction(double packet_time, const struct sniff_ip *ip, const struct sniff_udp *udp, char *connection_key, const int index_in_array)
@@ -224,6 +225,8 @@ void close_connection(int index_in_array)
     }
 
     strcpy(connections[index_in_array].buffer, "");
+    connections[index_in_array].total_bandwidth = 0;
+    connections[index_in_array].transaction.total_transaction_bandwidth = 0;
 }
 void update_connection(double packet_time, const struct sniff_ip *ip, const struct sniff_udp *udp, char *connection_key, int index_in_array)
 {
@@ -262,72 +265,105 @@ void init_connection(double packet_time, const struct sniff_ip *ip, const struct
     connections[index_in_array].ip_protocol = ip->ip_p;
     update_connection(packet_time, ip, udp, connection_key, index_in_array);
 }
+void after_last(int index_in_array)
+{
+
+    struct Node *current_node = connections[index_in_array].node;
+
+    if (current_node->prev == NULL)
+    {
+        head = head->next;
+    }
+    else
+    {
+        current_node->prev->next = current_node->next;
+    }
+    if (current_node->next != NULL)
+        current_node->next->prev = current_node->prev;
+    if (lastUsed->next != NULL)
+    {
+        current_node->next = lastUsed->next;
+        current_node->next->prev = current_node;
+    }
+    lastUsed->next = current_node;
+    current_node->prev = lastUsed;
+    lastUsed = lastUsed->next;
+    if (lastUsed == NULL)
+    {
+        printf("LLLL\n");
+    }
+
+    if (tailChanged == FALSE)
+    {
+
+        tail = lastUsed;
+    }
+    if (tail == NULL)
+    {
+        printf("bbbb\n");
+        sleep(1);
+    }
+}
+void after_tail(int index_in_array)
+{
+    tailChanged = TRUE;
+
+    struct Node *current_node = connections[index_in_array].node;
+    if (current_node->prev == NULL)
+    {
+        head = head->next;
+    }
+    else
+    {
+        current_node->prev->next = current_node->next;
+    }
+    if (current_node->next != NULL)
+        current_node->next->prev = current_node->prev;
+    if (tail == NULL)
+    {
+        tail = current_node;
+    }
+    else
+    {
+        tail->next = current_node;
+        current_node->prev = tail;
+        tail = tail->next;
+        current_node->next = NULL;
+    }
+    if (tail == NULL)
+    {
+        printf("aaaa\n");
+        sleep(1);
+    }
+}
 void have_connection(double packet_time, const struct sniff_ip *ip, const struct sniff_udp *udp, int index_in_array, char *connection_key, int client_server)
 {
 
     // if timeout we need to close the current coonection and open a new one, in case that the packet is from the client and biger then 700
     if (packet_time - connections[index_in_array].last_time_packet_recived > (double)config->video_connection_timeout)
     {
-        tailChanged = TRUE;
         // if the connection is open - close it
         if (connections[index_in_array].state == TRUE)
         {
             close_connection(index_in_array);
-            // move the node
-            struct Node *current_node = connections[index_in_array].node;
-            if (current_node == head)
-            {
-                head = head->next;
-            }
-            else
-            {
-                current_node->prev->next = current_node->next;
-            }
-            if (current_node->next != NULL)
-                current_node->next->prev = current_node->prev;
-
-            tail->next = current_node;
-            current_node->prev = tail;
-            current_node->next = NULL;
-            tail = tail->next;
         }
 
         // if the packet wont cause to open transaction, "throw" it
         if (client_server == FALSE || ntohs(udp->udp_len) < config->Request_packet_threshold)
         {
+            after_tail(index_in_array);
+
             return;
         }
-
-        update_connection(packet_time, ip, udp, connection_key, index_in_array);
         timeount++;
+        update_connection(packet_time, ip, udp, connection_key, index_in_array);
+        after_last(index_in_array);
+
         return;
     }
     if (connections[index_in_array].node->next != NULL)
     {
-        struct Node *current_node = connections[index_in_array].node;
-
-        if (current_node->prev == NULL)
-        {
-            head = head->next;
-        }
-        else
-        {
-            current_node->prev->next = current_node->next;
-        }
-        current_node->next->prev = current_node->prev;
-        if (lastUsed->next != NULL)
-        {
-            current_node->next = lastUsed->next;
-            current_node->next->prev = current_node;
-        }
-        lastUsed->next = current_node;
-        current_node->prev = lastUsed;
-        lastUsed = lastUsed->next;
-        if (tailChanged == FALSE)
-        {
-
-            tail = lastUsed;
-        }
+        after_last(index_in_array);
     }
 
     if (client_server == TRUE)
@@ -402,12 +438,7 @@ void check_connection(unsigned char *args, const struct pcap_pkthdr *header, con
     }
     else
     {
-        // check if there are place in the array
-        // if (num_connections == config->Max_number_of_connections)
-        // {
-        //     printf("ERROR!\n The max number of connections is  %d", config->Max_number_of_connections);
-        //     return;
-        // }
+
         // a new connection wont create with server to client packet, therefore we will check only the len of the udp
         if (client_to_server == FALSE || ntohs(udp->udp_len) < config->Request_packet_threshold)
         { // if  the len is less then 700 or this is not a req we wont open a new connection
@@ -422,7 +453,14 @@ void check_connection(unsigned char *args, const struct pcap_pkthdr *header, con
 
                 ++num_connections;
                 index_in_array = head->data;
+                if (connections[index_in_array].total_bandwidth >= (unsigned long)config->Minimum_video_connection_size)
+                {
+                    printf("%u\n", connections[index_in_array].total_bandwidth);
+                    sleep(1);
+                    count++;
+                }
                 close_connection(index_in_array);
+
                 snprintf(key, key, "%u%u%d%d%d", connections[index_in_array].server_ip, connections[index_in_array].client_ip, connections[index_in_array].client_port, connections[index_in_array].server_port, connections[index_in_array].ip_protocol);
                 ht_delete(hash_table, key);
 
@@ -472,7 +510,6 @@ void check_connection(unsigned char *args, const struct pcap_pkthdr *header, con
                 {
                     list[num_connections].next = NULL;
                     list[num_connections].prev = NULL;
-                    head = &list[num_connections];
                     lastUsed = head;
                     tail = lastUsed;
                 }
@@ -492,7 +529,6 @@ void check_connection(unsigned char *args, const struct pcap_pkthdr *header, con
         }
 
         // if there is not connection and the packet is from the client ,we need to open a new connection;
-        // init_connection(packet_time, ip, udp, (char *)&connection_key);
         init_connection(packet_time, ip, udp, connection_key, index_in_array);
     }
 }
@@ -548,10 +584,10 @@ int main()
     }
     fprintf(fpt, "Con_id,Server_ip,   Client_ip,  Server_port,Client_port,Ip_protocol,Trans_id, Start_time,Num_in,Num_out,Max_in_size,Min_in_size, Max_diff, Min_diff, sum_square, RTT\n");
 
-    // printf("%d\n", config->Max_number_of_connections);
     init_config_object();
-
+    // malloc the connections array
     key = (char *)malloc(sizeof(char) * 30);
+
     connection_key = (char *)malloc(sizeof(char) * 30);
     connections = (struct connection *)malloc(sizeof(struct connection) * config->Max_number_of_connections);
     list = (struct Node *)malloc(sizeof(struct Node) * config->Max_number_of_connections);
@@ -559,7 +595,6 @@ int main()
     head = &list[0];
     tail = head;
     connection_id = 0;
-
     pcap_loop(handle, 0, check_connection, NULL);
     pcap_close(handle);
     for (int i = 1; i < config->Max_number_of_connections; i++)
@@ -575,10 +610,11 @@ int main()
     fprintf(video, "Average size of the TDRs per video %lf\n", (double)size_of_the_videos / number_of_TDRs_per_video);
     fprintf(video, "Average duration of the TDRs per video %lf\n", duration_of_the_TDRs_per_video / video_connection);
     fprintf(video, "Average time between two consecutive TDRs %lf\n", (double)time_between_two_consecutive_TDRs / number_of_TDRs_per_video);
+
+    printf("%d\n", count);
+    printf("%d\n", timeount);
+    printf("video connection %d\n", video_connection);
     ht_destroy(hash_table);
     fclose(fpt);
     free(connections);
-    free(key);
-    free(connection_key);
-    free(list);
 }
